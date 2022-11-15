@@ -1,5 +1,6 @@
 {
     "name": "wgentechdevelopment/eav-customize",
+    "version": "1.0.0",
     "description": "Eav For Artisan.",
     "keywords": ["eav", "laravel"],
     "license": "MIT",
