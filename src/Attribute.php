@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 class Attribute extends Model
 {
     use Concerns\QueryBuilder;
+    const STORE_ID_DEFAULT = 0;
 
     const TYPE_STATIC = 'static';
-    
+
     /**
      * @{inheriteDoc}
      */
@@ -22,7 +23,7 @@ class Attribute extends Model
      * @{inheriteDoc}
      */
     public $timestamps = false;
-    
+
     /**
      * @{inheriteDoc}
      */
@@ -93,7 +94,7 @@ class Attribute extends Model
     {
         return $this->getAttributeCode();
     }
-    
+
     /**
      * Get attribute code
      *
@@ -121,7 +122,7 @@ class Attribute extends Model
     {
         return $this->getKey();
     }
-    
+
     /**
      * Set attribute entity instance
      *
@@ -162,7 +163,7 @@ class Attribute extends Model
     {
         return $this->getEntityTypeId();
     }
-    
+
     /**
      * Get Entity Type Id
      *
@@ -180,7 +181,7 @@ class Attribute extends Model
     {
         return $this->getEntityType();
     }
-    
+
     /**
      * Retreive entity type
      *
@@ -190,7 +191,7 @@ class Attribute extends Model
     {
         return Entity::findById($this->entityTypeId());
     }
-    
+
     /**
      * @alias getBackendType()
      */
@@ -216,7 +217,7 @@ class Attribute extends Model
     {
         return $this->getFrontendInput();
     }
-    
+
     /**
      * Retreive frontend type
      *
@@ -234,7 +235,7 @@ class Attribute extends Model
     {
         return $this->getFrontendLabel();
     }
-    
+
     /**
      * Retreive frontend label
      *
@@ -252,7 +253,7 @@ class Attribute extends Model
     {
         return $this->getDefaultValue();
     }
-    
+
     /**
      * Retreive default value
      *
@@ -272,36 +273,36 @@ class Attribute extends Model
     public static function add(array $data)
     {
         $instance = new static;
-                
+
         try {
             $eavEntity = Entity::findByCode($data['entity_code']);
         } catch (ModelNotFoundException $e) {
             throw new \Exception("Unable to load Entity : ".$data['entity_code']);
         }
-        
+
         unset($data['entity_code']);
-        
+
         $data['entity_id'] = $eavEntity->entity_id;
-        
+
         $options = [];
-        
+
         if ($data['frontend_type'] == 'select' && empty($data['source_class'])) {
             if (isset($data['options'])) {
                 $options = $data['options'];
                 unset($data['options']);
             }
         }
-        
-        
+
+
         $instance->fill($data)->save();
-        
+
         if ($instance->getKey()) {
             AttributeOption::add($instance, $options);
         }
 
         return $instance;
     }
-    
+
     /**
      * Delete a attribute from the database.
      *
@@ -311,17 +312,17 @@ class Attribute extends Model
     public static function remove(array $data)
     {
         $instance = new static;
-                
+
         try {
             $eavEntity = Entity::findByCode($data['entity_code']);
         } catch (ModelNotFoundException $e) {
             throw new \Exception("Unable to load Entity : ".$data['entity_code']);
         }
-        
+
         unset($data['entity_code']);
-        
+
         $data['entity_id'] = $eavEntity->entity_id;
-        
+
         $instance->where($data)->delete();
     }
 
@@ -365,7 +366,7 @@ class Attribute extends Model
     {
         return $this->getBackend();
     }
-    
+
     /**
      * Retrieve backend instance
      *
@@ -413,7 +414,7 @@ class Attribute extends Model
             } catch (ReflectionException $e) {
                 throw new \Exception('Invalid frontend class specified: ' . $this->getAttribute('frontend_class'));
             }
-            
+
             $this->frontend = $frontend->setAttribute($this);
         }
 
@@ -436,7 +437,7 @@ class Attribute extends Model
             } catch (ReflectionException $e) {
                 throw new \Exception('Invalid source class specified: ' . $this->getAttribute('source_class'));
             }
-            
+
             $this->source = $source->setAttribute($this);
         }
         return $this->source;
@@ -460,7 +461,7 @@ class Attribute extends Model
     {
         return $this->getBackendTable();
     }
-    
+
     /**
      * Get attribute backend table name
      *
@@ -477,7 +478,7 @@ class Attribute extends Model
         }
         return $this->dataTable;
     }
-    
+
     /**
      * Create a new Eloquent Collection instance.
      *
@@ -488,7 +489,7 @@ class Attribute extends Model
     {
         return new Collection($models);
     }
-    
+
     /**
      * Find the attribute by code.
      *
@@ -499,16 +500,16 @@ class Attribute extends Model
     public static function findByCode(string $code, string $entityCode)
     {
         $entity = Entity::findByCode($entityCode);
-        
+
         $instance = new static;
-        
+
         return $instance->newQuery()->where([
             'attribute_code' => $code,
             'entity_id' => $entity->getkey()
         ])->firstOrFail();
     }
-    
-    
+
+
     /**
      * Return attribute id
      *
@@ -533,7 +534,7 @@ class Attribute extends Model
         }
         return $this->attributeIdCache[$k];
     }
-    
+
     /**
      * Insert the data for the attribute.
      *
@@ -541,15 +542,28 @@ class Attribute extends Model
      * @param  int $entityId
      * @return bool
      */
-    public function insertAttribute($value, $entityId)
+    public function insertAttribute($value, $entityId, $storeId = self::STORE_ID_DEFAULT)
     {
         $insertData = [
             'entity_type_id' => $this->getEntity()->getKey(),
             'attribute_id' => $this->getKey(),
             'entity_id' => $entityId,
-            'value' => $value
+            'value' => $value,
+            'store_id' => $storeId
         ];
-        
+        if ($storeId != self::STORE_ID_DEFAULT) {
+            $insertDataForStoreDefault = [
+                'entity_type_id' => $this->getEntity()->getKey(),
+                'attribute_id' => $this->getKey(),
+                'entity_id' => $entityId,
+                'value' => $value,
+                'store_id' => self::STORE_ID_DEFAULT
+            ];
+            $this->newBaseQueryBuilder()
+                ->from($this->backendTable())
+                ->insert($insertDataForStoreDefault);
+        }
+
         return $this->newBaseQueryBuilder()
             ->from($this->backendTable())
             ->insert($insertData);
@@ -562,13 +576,18 @@ class Attribute extends Model
      * @param  int $entityId
      * @return bool
      */
-    public function updateAttribute($value, $entityId)
+    public function updateAttribute($value, $entityId, $storeId = self::STORE_ID_DEFAULT)
     {
         $attributes = [
             'entity_type_id' => $this->entity()->getKey(),
             'attribute_id' => $this->getKey(),
             'entity_id' => $entityId,
         ];
+        $countValueWithStoreId = $this->newBaseQueryBuilder()->from($this->backendTable())
+            ->where('store_id', $storeId)->count();
+        if ($countValueWithStoreId <= 0) {
+            return $this->insertAttribute($value, $entityId, $storeId);
+        }
 
         return $this->newBaseQueryBuilder()
             ->from($this->backendTable())

@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace Eav;
 
@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 abstract class Model extends Eloquent
 {
+    const STORE_ID_DEFAULT = 0;
     use AttributeTraits;
 
     /**
@@ -27,7 +28,7 @@ abstract class Model extends Eloquent
      * @var bool
      */
     protected static $unguarded = true;
-    
+
     /**
      * Create a new Eloquent model instance.
      *
@@ -54,7 +55,7 @@ abstract class Model extends Eloquent
     {
         return $this->hasOne(AttributeSet::class, 'attribute_set_id');
     }
-    
+
     /**
      * Get the Entity related to the model.
      *
@@ -103,7 +104,7 @@ abstract class Model extends Eloquent
 
         return $table;
     }
-    
+
     /**
      * Enable or Disable Flat table.
      *
@@ -113,7 +114,7 @@ abstract class Model extends Eloquent
     {
         $this->baseEntity()->is_flat_enabled = $flag;
     }
-    
+
     /**
      * Check if the Entity can use flat table.
      *
@@ -132,7 +133,7 @@ abstract class Model extends Eloquent
     public function validate()
     {
         $attributes = $this->attributes;
-        
+
         $loadedAttributes = $this->loadAttributes(
             array_keys($attributes),
             true,
@@ -141,11 +142,11 @@ abstract class Model extends Eloquent
     }
 
     /**
-    * Create a new Eloquent query builder for the model.
-    *
-    * @param  \Illuminate\Database\Query\Builder  $query
-    * @return \Illuminate\Database\Eloquent\Builder|static
-    */
+     * Create a new Eloquent query builder for the model.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder|static
+     */
     public function newEloquentBuilder($query)
     {
         return new EavEloquentBuilder($query);
@@ -187,7 +188,7 @@ abstract class Model extends Eloquent
         if ($this->usesTimestamps()) {
             $this->updateTimestamps();
         }
-        
+
         return $this->getConnection()->transaction(function () use ($query, $options) {
             if ($this->fireModelEvent('creating') === false) {
                 return false;
@@ -197,21 +198,21 @@ abstract class Model extends Eloquent
             // the query builder, which will give us back the final inserted ID for this
             // table from the database. Not all tables have to be incrementing though.
             $attributes = $this->getAttributes();
-            
+
             $loadedAttributes = $this->loadAttributes(array_keys($attributes), true, true);
-            
+
             $loadedAttributes->validate($attributes);
-            
+
             if (!$this->insertMainTable($query, $options, $attributes, $loadedAttributes)) {
                 return false;
             }
-            
+
             if (!$this->insertAttributes($query, $options, $attributes, $loadedAttributes)) {
                 return false;
             }
-            
+
             $this->fireModelEvent('created', false);
-             
+
             return true;
         });
     }
@@ -229,9 +230,9 @@ abstract class Model extends Eloquent
         if ($this->fireModelEvent('creating.main') === false) {
             return false;
         }
-         
+
         $mainTableAttribute = $this->getMainTableAttribute($loadedAttributes);
-        
+
         $mainData = array_intersect_key($attributes, array_flip($mainTableAttribute));
 
         if ($this->getIncrementing()) {
@@ -248,7 +249,7 @@ abstract class Model extends Eloquent
 
             $query->insert($mainData);
         }
-        
+
         // We will go ahead and set the exists property to true, so that it is set when
         // the created event is fired, just in case the developer tries to update it
         // during the event. This will allow them to do so and run an update here.
@@ -257,7 +258,7 @@ abstract class Model extends Eloquent
         $this->wasRecentlyCreated = true;
 
         $this->fireModelEvent('created.main', false);
-        
+
         return true;
     }
 
@@ -273,10 +274,11 @@ abstract class Model extends Eloquent
         $loadedAttributes->each(function ($attribute, $key) use ($modelData) {
             if (!$attribute->isStatic()) {
                 $attribute->setEntity($this->baseEntity());
-                $attribute->insertAttribute($modelData[$attribute->getAttributeCode()], $this->getKey());
+                $storeId = $modelData['store_id'] ?? self::STORE_ID_DEFAULT;
+                $attribute->insertAttribute($modelData[$attribute->getAttributeCode()], $this->getKey(), $storeId);
             }
         });
-        
+
         return true;
     }
 
@@ -299,33 +301,33 @@ abstract class Model extends Eloquent
         if ($this->usesTimestamps()) {
             $this->updateTimestamps();
         }
-             
+
         $dirty = $this->getDirty();
 
         if (count($dirty) > 0) {
             $loadedAttributes = $this->loadAttributes(array_keys($dirty));
-        
+
             $loadedAttributes->validate($dirty);
 
             return $this->getConnection()->transaction(function () use ($query, $options, $dirty, $loadedAttributes) {
-            
+
                 // If the updating event returns false, we will cancel the update operation so
                 // developers can hook Validation systems into their models and cancel this
                 // operation if the model does not pass validation. Otherwise, we update.
                 if ($this->fireModelEvent('updating') === false) {
                     return false;
                 }
-                
+
                 if (!$this->updateMainTable($query, $options, $dirty, $loadedAttributes)) {
                     return false;
                 }
-                
+
                 if (!$this->updateAttributes($query, $options, $dirty, $loadedAttributes)) {
                     return false;
                 }
-                
+
                 $this->fireModelEvent('updated', false);
-                 
+
                 return true;
             });
         }
@@ -345,18 +347,18 @@ abstract class Model extends Eloquent
         if ($this->fireModelEvent('updating.main') === false) {
             return false;
         }
-         
+
         $mainTableAttribute = $this->getMainTableAttribute($loadedAttributes);
-        
+
         $mainData = array_intersect_key($attributes, array_flip($mainTableAttribute));
-        
+
         $numRows = $this->setKeysForSaveQuery($query)->update($mainData);
 
         // @see Illuminate\Database\Eloquent\Concerns\HasAttributes::syncChanges()
         $this->changes = $mainData;
 
         $this->fireModelEvent('updated.main', false);
-        
+
         return true;
     }
 
@@ -372,10 +374,11 @@ abstract class Model extends Eloquent
         $loadedAttributes->each(function ($attribute, $key) use ($modelData) {
             if (!$attribute->isStatic()) {
                 $attribute->setEntity($this->baseEntity());
-                $attribute->updateAttribute($modelData[$attribute->getAttributeCode()], $this->getKey());
+                $storeId = $modelData['store_id'] ?? self::STORE_ID_DEFAULT;
+                $attribute->updateAttribute($modelData[$attribute->getAttributeCode()], $this->getKey(), $storeId);
             }
         });
-        
+
         return true;
     }
 
