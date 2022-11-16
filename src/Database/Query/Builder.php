@@ -15,6 +15,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 
 class Builder extends QueryBuilder
 {
+    const DEFAULT_STORE = 0;
     use Attribute;
     
     /**
@@ -81,6 +82,11 @@ class Builder extends QueryBuilder
      * @var array
      */
     public $joinCache = [];
+
+    /**
+     * @var mixed
+     */
+    public $storeId = self::DEFAULT_STORE;
 
     
     /**
@@ -927,6 +933,18 @@ class Builder extends QueryBuilder
 
         $this->attributeColumns = array_merge($this->attributeColumns, (array)$column);
         $this->attributeOrderBy[$property][] = compact('column', 'direction');
+
+        return $this;
+    }
+
+    /**
+     * Set "store_id" clause to the query.
+     *
+     * @param $value
+     * @return $this
+     */
+    public function setStore($value) {
+        $this->storeId = $value;
 
         return $this;
     }

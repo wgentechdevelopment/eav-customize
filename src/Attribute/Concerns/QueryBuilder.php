@@ -31,6 +31,7 @@ trait QueryBuilder
     {   
         $subQuery = DB::table($this->backendTable())->select("value")
             ->where('attribute_id', $this->attributeId())
+            ->where('store_id', $query->storeId)
             ->whereColumn("{$query->from}.{$this->entity()->entityKey()}", "entity_id");
 
         $query->selectSub($subQuery, $this->code());
