@@ -582,12 +582,8 @@ class Attribute extends Model
             'entity_type_id' => $this->entity()->getKey(),
             'attribute_id' => $this->getKey(),
             'entity_id' => $entityId,
+            'store_id' => $storeId
         ];
-        $countValueWithStoreId = $this->newBaseQueryBuilder()->from($this->backendTable())
-            ->where('store_id', $storeId)->count();
-        if ($countValueWithStoreId <= 0) {
-            return $this->insertAttribute($value, $entityId, $storeId);
-        }
 
         return $this->newBaseQueryBuilder()
             ->from($this->backendTable())
