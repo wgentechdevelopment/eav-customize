@@ -113,12 +113,14 @@ trait QueryBuilder
             if ($joinType == 'left') {
                 $query->leftJoin("{$this->backendTable()} as {$this->code()}_attr", function ($join) use ($query) {
                     $join->on("{$query->from}.{$this->entity()->entityKey()}", '=', "{$this->code()}_attr.entity_id")
-                        ->where("{$this->code()}_attr.attribute_id", "=", $this->attributeId());
+                        ->where("{$this->code()}_attr.attribute_id", "=", $this->attributeId())
+                        ->where("{$this->code()}_attr.store_id", "=", $query->storeId);
                 });
             } else {
                 $query->join("{$this->backendTable()} as {$this->code()}_attr", function ($join) use ($query) {
                     $join->on("{$query->from}.{$this->entity()->entityKey()}", '=', "{$this->code()}_attr.entity_id")
-                        ->where("{$this->code()}_attr.attribute_id", "=", $this->attributeId());
+                        ->where("{$this->code()}_attr.attribute_id", "=", $this->attributeId())
+                        ->where("{$this->code()}_attr.store_id", "=", $query->storeId);
                 });
             }
         }
